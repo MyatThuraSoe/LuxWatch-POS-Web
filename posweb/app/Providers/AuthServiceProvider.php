@@ -61,3 +61,6 @@ class AuthServiceProvider extends ServiceProvider
         $this->registerPolicies();
     }
 }
+        // Phase 10: Report Policies
+        $this->policy(\App\Models\Sale::class, \App\Policies\ReportPolicy::class);
+        $this->policy(\App\Models\InventoryItem::class, \App\Policies\ReportPolicy::class);
