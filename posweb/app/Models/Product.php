@@ -24,11 +24,14 @@ class Product extends Model
         'cost_price',
         'retail_price',
         'tax_rate_id',
+        'warranty_months',
+        'warranty_terms',
     ];
 
     protected $casts = [
         'cost_price' => 'decimal:2',
         'retail_price' => 'decimal:2',
+        'warranty_months' => 'integer',
     ];
 
     public static function boot()
