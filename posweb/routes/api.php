@@ -226,3 +226,18 @@ Route::middleware(['auth:sanctum', 'role:admin,owner,employee'])->group(function
     // Expiring Warranties (Admin/Owner)
     Route::get('/warranties/expiring', [CustomerController::class, 'expiringWarranties'])->name('warranties.expiring')->middleware('role:admin,owner');
 });
+
+// ==========================================
+// Phase 10: Reports & Analytics
+// ==========================================
+Route::middleware(['auth:sanctum', 'role:admin,owner,employee'])->group(function () {
+    Route::prefix('reports')->controller(\App\Http\Controllers\Api\ReportController::class)->group(function () {
+        Route::get('/dashboard', 'dashboard');
+        Route::get('/sales', 'sales')->middleware('permission:reports.sales');
+        Route::get('/financial', 'financial')->middleware('permission:reports.financial');
+        Route::get('/inventory', 'inventory')->middleware('permission:reports.inventory');
+        Route::get('/employees', 'employees')->middleware('permission:reports.employee');
+        Route::post('/export', 'export')->middleware('permission:reports.export');
+        Route::get('/exports/{id}/download', 'download');
+    });
+});
