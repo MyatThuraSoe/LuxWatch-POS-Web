@@ -11,6 +11,8 @@ use App\Http\Controllers\Api\V1\InventoryController;
 use App\Http\Controllers\Api\V1\SupplierController;
 use App\Http\Controllers\Api\V1\PurchaseOrderController;
 use App\Http\Controllers\Api\V1\PosController;
+use App\Http\Controllers\Api\V1\ReceiptController;
+use App\Http\Controllers\Api\V1\CustomerController;
 
 /*
 |--------------------------------------------------------------------------
@@ -131,9 +133,96 @@ Route::prefix('v1')->group(function () {
         Route::prefix('discounts')->group(function () {
             Route::get('/validate', [PosController::class, 'validateDiscount'])->middleware(['permission:pos.discount.apply,pos.checkout']);
         });
+
+        // Receipts & Vouchers (Phase 8)
+        Route::prefix('receipts')->group(function () {
+            Route::get('/{sale_id}', [ReceiptController::class, 'show'])->middleware(['permission:receipts.view,receipts.print']);
+            Route::post('/{sale_id}/print', [ReceiptController::class, 'print'])->middleware(['permission:receipts.print']);
+            
+            // Templates (Admin/Owner only)
+            Route::middleware(['role:admin,owner'])->group(function () {
+                Route::get('/templates', [ReceiptController::class, 'getTemplates']);
+                Route::put('/templates/{id}', [ReceiptController::class, 'updateTemplate']);
+                Route::get('/logs', [ReceiptController::class, 'getPrintLogs']);
+            });
+        });
+
+        // Customers & Warranty (Phase 9)
+        Route::prefix('customers')->group(function () {
+            Route::get('/', [CustomerController::class, 'index'])->middleware(['permission:customers.view,customers.create']);
+            Route::post('/', [CustomerController::class, 'store'])->middleware(['permission:customers.create']);
+            Route::get('/{customer}', [CustomerController::class, 'show'])->middleware(['permission:customers.view']);
+            Route::put('/{customer}', [CustomerController::class, 'update'])->middleware(['permission:customers.create']);
+            Route::delete('/{customer}', [CustomerController::class, 'destroy'])->middleware(['permission:customers.create']);
+            Route::get('/{customer}/history', [CustomerController::class, 'history'])->middleware(['permission:customers.view']);
+        });
+
+        Route::prefix('warranties')->group(function () {
+            Route::get('/serial/{serialCode}', [CustomerController::class, 'warrantyBySerial'])->middleware(['permission:warranties.view']);
+            Route::get('/{warranty}', [CustomerController::class, 'showWarranty'])->middleware(['permission:warranties.view']);
+            Route::post('/{warranty}/claim', [CustomerController::class, 'submitClaim'])->middleware(['permission:warranties.claim']);
+            Route::post('/{warranty}/void', [CustomerController::class, 'voidWarranty'])->middleware(['role:admin,owner', 'permission:warranties.claim']);
+            Route::get('/expiring', [CustomerController::class, 'expiringWarranties'])->middleware(['role:admin,owner', 'permission:warranties.view']);
+        });
+
+        Route::prefix('repairs')->group(function () {
+            Route::get('/', [CustomerController::class, 'getRepairs'])->middleware(['permission:repairs.manage']);
+            Route::get('/stats', [CustomerController::class, 'repairStats'])->middleware(['permission:repairs.manage']);
+            Route::get('/overdue', [CustomerController::class, 'overdueRepairs'])->middleware(['role:admin,owner', 'permission:repairs.manage']);
+            Route::patch('/{repairJob}', [CustomerController::class, 'updateRepairStatus'])->middleware(['permission:repairs.manage']);
+            Route::get('/technician/{technicianId}', [CustomerController::class, 'repairsByTechnician'])->middleware(['permission:repairs.manage']);
+        });
     });
 });
 
 Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
+
+// ==========================================
+// Phase 8: Receipt & Voucher Routes
+// ==========================================
+use App\Http\Controllers\ReceiptController;
+
+Route::middleware(['auth:sanctum', 'role:admin,owner,employee'])->group(function () {
+    // Receipts
+    Route::get('/receipts/{sale_id}', [ReceiptController::class, 'show'])->name('receipts.show');
+    Route::post('/receipts/{sale_id}/print', [ReceiptController::class, 'print'])->name('receipts.print');
+    
+    // Templates (Admin/Owner only)
+    Route::middleware(['role:admin,owner'])->group(function () {
+        Route::get('/receipts/templates', [ReceiptController::class, 'getTemplates'])->name('receipts.templates.index');
+        Route::put('/receipts/templates/{id}', [ReceiptController::class, 'updateTemplate'])->name('receipts.templates.update');
+    });
+    
+    // Print Logs (Admin/Owner only)
+    Route::middleware(['role:admin,owner'])->group(function () {
+        Route::get('/receipts/logs', [ReceiptController::class, 'getPrintLogs'])->name('receipts.logs.index');
+    });
+});
+
+// ==========================================
+// Phase 9: Customer & Warranty Routes
+// ==========================================
+use App\Http\Controllers\CustomerController;
+
+Route::middleware(['auth:sanctum', 'role:admin,owner,employee'])->group(function () {
+    // Customers
+    Route::apiResource('customers', CustomerController::class);
+    Route::get('/customers/{customer}/history', [CustomerController::class, 'history'])->name('customers.history');
+    
+    // Warranties
+    Route::get('/warranties/serial/{serialCode}', [CustomerController::class, 'warrantyBySerial'])->name('warranties.serial');
+    Route::post('/warranties/{warranty}/claim', [CustomerController::class, 'submitClaim'])->name('warranties.claim');
+    Route::post('/warranties/{warranty}/void', [CustomerController::class, 'voidWarranty'])->name('warranties.void')->middleware('role:admin,owner');
+    
+    // Repair Jobs
+    Route::get('/repairs', [CustomerController::class, 'getRepairs'])->name('repairs.index');
+    Route::get('/repairs/stats', [CustomerController::class, 'repairStats'])->name('repairs.stats');
+    Route::get('/repairs/overdue', [CustomerController::class, 'overdueRepairs'])->name('repairs.overdue')->middleware('role:admin,owner');
+    Route::patch('/repairs/{repairJob}', [CustomerController::class, 'updateRepairStatus'])->name('repairs.update');
+    Route::get('/repairs/technician/{technicianId}', [CustomerController::class, 'repairsByTechnician'])->name('repairs.technician');
+    
+    // Expiring Warranties (Admin/Owner)
+    Route::get('/warranties/expiring', [CustomerController::class, 'expiringWarranties'])->name('warranties.expiring')->middleware('role:admin,owner');
+});
