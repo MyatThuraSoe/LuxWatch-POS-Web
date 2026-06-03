@@ -11,8 +11,8 @@ use App\Http\Controllers\Api\V1\InventoryController;
 use App\Http\Controllers\Api\V1\SupplierController;
 use App\Http\Controllers\Api\V1\PurchaseOrderController;
 use App\Http\Controllers\Api\V1\PosController;
-use App\Http\Controllers\Api\V1\ReceiptController;
-use App\Http\Controllers\Api\V1\CustomerController;
+use App\Http\Controllers\ReceiptController;
+use App\Http\Controllers\CustomerController;
 
 /*
 |--------------------------------------------------------------------------
@@ -182,49 +182,49 @@ Route::get('/user', function (Request $request) {
 // ==========================================
 // Phase 8: Receipt & Voucher Routes
 // ==========================================
-use App\Http\Controllers\ReceiptController;
+use App\Http\Controllers\ReceiptController as ReceiptWebController;
 
 Route::middleware(['auth:sanctum', 'role:admin,owner,employee'])->group(function () {
     // Receipts
-    Route::get('/receipts/{sale_id}', [ReceiptController::class, 'show'])->name('receipts.show');
-    Route::post('/receipts/{sale_id}/print', [ReceiptController::class, 'print'])->name('receipts.print');
+    Route::get('/receipts/{sale_id}', [ReceiptWebController::class, 'show'])->name('receipts.show');
+    Route::post('/receipts/{sale_id}/print', [ReceiptWebController::class, 'print'])->name('receipts.print');
     
     // Templates (Admin/Owner only)
     Route::middleware(['role:admin,owner'])->group(function () {
-        Route::get('/receipts/templates', [ReceiptController::class, 'getTemplates'])->name('receipts.templates.index');
-        Route::put('/receipts/templates/{id}', [ReceiptController::class, 'updateTemplate'])->name('receipts.templates.update');
+        Route::get('/receipts/templates', [ReceiptWebController::class, 'getTemplates'])->name('receipts.templates.index');
+        Route::put('/receipts/templates/{id}', [ReceiptWebController::class, 'updateTemplate'])->name('receipts.templates.update');
     });
     
     // Print Logs (Admin/Owner only)
     Route::middleware(['role:admin,owner'])->group(function () {
-        Route::get('/receipts/logs', [ReceiptController::class, 'getPrintLogs'])->name('receipts.logs.index');
+        Route::get('/receipts/logs', [ReceiptWebController::class, 'getPrintLogs'])->name('receipts.logs.index');
     });
 });
 
 // ==========================================
 // Phase 9: Customer & Warranty Routes
 // ==========================================
-use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\CustomerController as CustomerWebController;
 
 Route::middleware(['auth:sanctum', 'role:admin,owner,employee'])->group(function () {
     // Customers
-    Route::apiResource('customers', CustomerController::class);
-    Route::get('/customers/{customer}/history', [CustomerController::class, 'history'])->name('customers.history');
+    Route::apiResource('customers', CustomerWebController::class);
+    Route::get('/customers/{customer}/history', [CustomerWebController::class, 'history'])->name('customers.history');
     
     // Warranties
-    Route::get('/warranties/serial/{serialCode}', [CustomerController::class, 'warrantyBySerial'])->name('warranties.serial');
-    Route::post('/warranties/{warranty}/claim', [CustomerController::class, 'submitClaim'])->name('warranties.claim');
-    Route::post('/warranties/{warranty}/void', [CustomerController::class, 'voidWarranty'])->name('warranties.void')->middleware('role:admin,owner');
+    Route::get('/warranties/serial/{serialCode}', [CustomerWebController::class, 'warrantyBySerial'])->name('warranties.serial');
+    Route::post('/warranties/{warranty}/claim', [CustomerWebController::class, 'submitClaim'])->name('warranties.claim');
+    Route::post('/warranties/{warranty}/void', [CustomerWebController::class, 'voidWarranty'])->name('warranties.void')->middleware('role:admin,owner');
     
     // Repair Jobs
-    Route::get('/repairs', [CustomerController::class, 'getRepairs'])->name('repairs.index');
-    Route::get('/repairs/stats', [CustomerController::class, 'repairStats'])->name('repairs.stats');
-    Route::get('/repairs/overdue', [CustomerController::class, 'overdueRepairs'])->name('repairs.overdue')->middleware('role:admin,owner');
-    Route::patch('/repairs/{repairJob}', [CustomerController::class, 'updateRepairStatus'])->name('repairs.update');
-    Route::get('/repairs/technician/{technicianId}', [CustomerController::class, 'repairsByTechnician'])->name('repairs.technician');
+    Route::get('/repairs', [CustomerWebController::class, 'getRepairs'])->name('repairs.index');
+    Route::get('/repairs/stats', [CustomerWebController::class, 'repairStats'])->name('repairs.stats');
+    Route::get('/repairs/overdue', [CustomerWebController::class, 'overdueRepairs'])->name('repairs.overdue')->middleware('role:admin,owner');
+    Route::patch('/repairs/{repairJob}', [CustomerWebController::class, 'updateRepairStatus'])->name('repairs.update');
+    Route::get('/repairs/technician/{technicianId}', [CustomerWebController::class, 'repairsByTechnician'])->name('repairs.technician');
     
     // Expiring Warranties (Admin/Owner)
-    Route::get('/warranties/expiring', [CustomerController::class, 'expiringWarranties'])->name('warranties.expiring')->middleware('role:admin,owner');
+    Route::get('/warranties/expiring', [CustomerWebController::class, 'expiringWarranties'])->name('warranties.expiring')->middleware('role:admin,owner');
 });
 
 // ==========================================

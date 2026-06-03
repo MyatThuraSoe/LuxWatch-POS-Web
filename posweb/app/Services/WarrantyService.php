@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\Customer;
 use App\Models\Warranty;
 use App\Models\WarrantyClaim;
 use App\Models\RepairJob;
@@ -11,37 +10,6 @@ use App\Models\SerialNumber;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
-
-class CustomerService
-{
-    public function create(array $data): Customer
-    {
-        return Customer::create($data);
-    }
-
-    public function update(Customer $customer, array $data): Customer
-    {
-        $customer->update($data);
-        return $customer->fresh();
-    }
-
-    public function getWithHistory(int $customerId): Customer
-    {
-        return Customer::with([
-            'sales.items.variant.product.brand',
-            'warranties.serial.variant.product'
-        ])->findOrFail($customerId);
-    }
-
-    public function search(string $query, int $perPage = 20)
-    {
-        return Customer::where('name', 'like', "%{$query}%")
-            ->orWhere('email', 'like', "%{$query}%")
-            ->orWhere('phone', 'like', "%{$query}%")
-            ->orderBy('name')
-            ->paginate($perPage);
-    }
-}
 
 class WarrantyService
 {
@@ -56,7 +24,6 @@ class WarrantyService
                     continue;
                 }
 
-                // Check if warranty already exists for this serial
                 $existing = Warranty::where('serial_id', $item->serial_id)->first();
                 if ($existing) {
                     continue;
@@ -78,7 +45,6 @@ class WarrantyService
     public function getBySerial(string $serialCode): ?Warranty
     {
         $serial = SerialNumber::where('serial_code', $serialCode)->first();
-        
         if (!$serial) {
             return null;
         }
@@ -106,7 +72,6 @@ class WarrantyService
             }
         }
 
-        // Check for active claims
         $activeClaim = $warranty->claims()->where('status', 'pending')->exists();
         if ($activeClaim) {
             $isValid = false;
@@ -136,7 +101,6 @@ class WarrantyService
                 'submitted_by' => $user->id,
             ]);
 
-            // Update warranty status
             $warranty->update(['status' => 'claimed']);
 
             return $claim;
@@ -148,22 +112,18 @@ class WarrantyService
         return DB::transaction(function () use ($claim, $technician) {
             $claim->approve();
 
-            $repairJob = RepairJob::create([
+            return RepairJob::create([
                 'claim_id' => $claim->id,
                 'serial_id' => $claim->warranty->serial_id,
                 'status' => 'received',
                 'technician_id' => $technician?->id,
             ]);
-
-            return $repairJob;
         });
     }
 
     public function rejectClaim(WarrantyClaim $claim, string $rejectionReason): WarrantyClaim
     {
         $claim->reject();
-        
-        // Revert warranty status if no other active claims
         $warranty = $claim->warranty;
         $hasOtherActiveClaims = $warranty->claims()
             ->where('id', '!=', $claim->id)
@@ -197,74 +157,5 @@ class WarrantyService
             ->with(['customer', 'serial.variant.product'])
             ->orderBy('end_date')
             ->get();
-    }
-}
-
-class RepairService
-{
-    public function updateStatus(RepairJob $job, string $status, ?string $diagnosis = null, ?float $cost = null): RepairJob
-    {
-        $data = ['status' => $status];
-
-        if ($diagnosis !== null) {
-            $data['diagnosis'] = $diagnosis;
-        }
-
-        if ($cost !== null) {
-            $data['repair_cost'] = $cost;
-        }
-
-        if ($status === 'ready' || $status === 'completed') {
-            $data['estimated_completion'] = now();
-        }
-
-        $job->update($data);
-
-        return $job->fresh();
-    }
-
-    public function getOverdueJobs()
-    {
-        return RepairJob::where('status', '!=', 'completed')
-            ->where('status', '!=', 'cancelled')
-            ->where('created_at', '<', now()->subDays(RepairJob::SLA_DAYS))
-            ->with(['claim.warranty.serial.variant.product', 'technician'])
-            ->orderBy('created_at')
-            ->get();
-    }
-
-    public function getByTechnician(int $technicianId, ?string $status = null)
-    {
-        $query = RepairJob::where('technician_id', $technicianId);
-
-        if ($status) {
-            $query->where('status', $status);
-        }
-
-        return $query->with(['claim.warranty', 'serial.variant'])
-            ->orderByDesc('updated_at')
-            ->paginate(20);
-    }
-
-    public function getStats(): array
-    {
-        $total = RepairJob::count();
-        $completed = RepairJob::where('status', 'completed')->count();
-        $inProgress = RepairJob::whereIn('status', ['received', 'diagnosing', 'repairing'])->count();
-        $ready = RepairJob::where('status', 'ready')->count();
-        $overdue = $this->getOverdueJobs()->count();
-
-        $avgCompletionDays = RepairJob::where('status', 'completed')
-            ->selectRaw('AVG(DATEDIFF(updated_at, created_at)) as avg_days')
-            ->value('avg_days') ?? 0;
-
-        return [
-            'total' => $total,
-            'completed' => $completed,
-            'in_progress' => $inProgress,
-            'ready_for_pickup' => $ready,
-            'overdue' => $overdue,
-            'avg_completion_days' => round($avgCompletionDays, 1),
-        ];
     }
 }

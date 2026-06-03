@@ -33,14 +33,18 @@ class AppServiceProvider extends ServiceProvider
     /**
      * Bootstrap any application services.
      */
+
+
     public function boot(): void
     {
-        // Register event listeners
-        Event::listen([
-            SaleCompleted::class => [
-                GenerateWarranty::class,
-                DeductInventory::class,
-            ],
-        ]);
+        Event::listen(
+            SaleCompleted::class,
+            GenerateWarranty::class
+        );
+
+        Event::listen(
+            SaleCompleted::class,
+            DeductInventory::class
+        );
     }
 }
